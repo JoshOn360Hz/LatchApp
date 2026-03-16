@@ -11,7 +11,7 @@ struct VaultLockView: View {
                 .ignoresSafeArea()
 
             Rectangle()
-                .fill(.ultraThinMaterial.opacity(colorScheme == .dark ? 0.35 : 0.55))
+                .fill(.ultraThinMaterial.opacity(colorScheme == .dark ? 0.95 : 0.95))
                 .ignoresSafeArea()
 
             VStack(spacing: 24) {

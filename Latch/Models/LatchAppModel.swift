@@ -231,6 +231,69 @@ final class LatchAppModel {
         try otpAuthParser.parse(scannedCode, fallbackAccountName: fallbackUsername)
     }
 
+    func exportOTPCSV(for item: VaultItem) -> String? {
+        guard
+            let otpReference = item.otpReference,
+            let configuration = item.otpConfiguration,
+            let secret = keychain.string(forKey: otpReference)
+        else {
+            return nil
+        }
+
+        let accountName = configuration.accountName ?? item.username
+        let issuer = emptyToNil(configuration.issuer ?? item.service)
+        let otpAuthURL = otpAuthURL(
+            secret: secret,
+            issuer: issuer,
+            accountName: accountName,
+            digits: configuration.digits,
+            period: configuration.period
+        )
+
+        let fields = [
+            item.service,
+            item.username,
+            issuer ?? "",
+            accountName,
+            secret,
+            String(configuration.digits),
+            String(configuration.period),
+            otpAuthURL
+        ]
+
+        let header = "service,username,issuer,account_name,secret,digits,period,otpauth_url"
+        let row = fields.map(Self.escapeCSVField).joined(separator: ",")
+        return "\(header)\n\(row)"
+    }
+
+    private func otpAuthURL(
+        secret: String,
+        issuer: String?,
+        accountName: String,
+        digits: Int,
+        period: Int
+    ) -> String {
+        let label = issuer.map { "\($0):\(accountName)" } ?? accountName
+
+        var components = URLComponents()
+        components.scheme = "otpauth"
+        components.host = "totp"
+        components.path = "/\(label)"
+
+        var queryItems = [
+            URLQueryItem(name: "secret", value: secret),
+            URLQueryItem(name: "digits", value: String(digits)),
+            URLQueryItem(name: "period", value: String(period))
+        ]
+
+        if let issuer {
+            queryItems.append(URLQueryItem(name: "issuer", value: issuer))
+        }
+
+        components.queryItems = queryItems
+        return components.string ?? ""
+    }
+
     func importPasswords(from url: URL) throws -> PasswordImportSummary {
         let shouldStopAccess = url.startAccessingSecurityScopedResource()
         defer {
@@ -435,6 +498,11 @@ final class LatchAppModel {
     private func emptyToNil(_ value: String) -> String? {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private static func escapeCSVField(_ value: String) -> String {
+        let escaped = value.replacingOccurrences(of: "\"", with: "\"\"")
+        return "\"\(escaped)\""
     }
 }
 

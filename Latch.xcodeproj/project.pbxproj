@@ -10,9 +10,22 @@
 		B124D01B2F6797D100932EAF /* Latch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Latch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		B1EF59C92F67B4D000F2DDA8 /* Exceptions for "Latch" folder in "Latch" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = B124D01A2F6797D100932EAF /* Latch */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		B124D01D2F6797D100932EAF /* Latch */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				B1EF59C92F67B4D000F2DDA8 /* Exceptions for "Latch" folder in "Latch" target */,
+			);
 			path = Latch;
 			sourceTree = "<group>";
 		};
@@ -256,6 +269,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Latch/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Latch;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Scan QR codes to configure two-factor authentication secrets locally on device.";
@@ -307,6 +321,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Latch/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Latch;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Scan QR codes to configure two-factor authentication secrets locally on device.";

@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct VaultItemDetailView: View {
     @Bindable var model: LatchAppModel
@@ -11,6 +12,8 @@ struct VaultItemDetailView: View {
     @State private var revealedPassword: String?
     @State private var actionMessage: String?
     @State private var showingDeleteConfirmation = false
+    @State private var exportDocument: OTPCSVDocument?
+    @State private var showingCSVExporter = false
 
     private var passwordStrength: PasswordStrength {
         model.passwordStrength(for: item)
@@ -135,38 +138,7 @@ struct VaultItemDetailView: View {
                 }
 
                 if item.hasTOTP {
-                    SurfaceCard {
-                        VStack(alignment: .leading, spacing: 16) {
-                            LatchSectionHeader(
-                                eyebrow: nil,
-                                title: "Live two-factor code",
-                                detail: ""
-                            )
-
-                            TimelineView(.periodic(from: .now, by: 1)) { context in
-                                if let snapshot = model.totpSnapshot(for: item, at: context.date) {
-                                    VStack(alignment: .leading, spacing: 10) {
-                                        Text(snapshot.code)
-                                            .font(.system(size: 34, weight: .bold, design: .monospaced))
-                                        Text("Authenticator code")
-                                            .font(.subheadline.weight(.semibold))
-                                        StatusPill(title: "Refreshes in \(snapshot.secondsRemaining)s", tone: .accent)
-                                    }
-                                } else {
-                                    Text("Unable to generate a code for this secret.")
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-
-                            Button("Copy Current Code") {
-                                if let snapshot = model.totpSnapshot(for: item) {
-                                    model.copyToPasteboard(snapshot.code.replacingOccurrences(of: " ", with: ""))
-                                    actionMessage = "Code copied."
-                                }
-                            }
-                            .buttonStyle(.bordered)
-                        }
-                    }
+                    otpCard
                 }
 
                 if !item.notes.isEmpty {
@@ -197,22 +169,26 @@ struct VaultItemDetailView: View {
 
                 SurfaceCard {
                     HStack(spacing: 10) {
-                        Button("Edit Entry") {
+                        Button {
                             onEdit()
+                        } label: {
+                            sheetActionLabel(title: "Edit Entry", systemImage: "pencil")
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(accentPalette.color)
                         .frame(maxWidth: .infinity)
 
-                        Button("Delete Entry", role: .destructive) {
+                        Button(role: .destructive) {
                             showingDeleteConfirmation = true
+                        } label: {
+                            sheetActionLabel(title: "Delete Entry", systemImage: "trash")
                         }
                         .buttonStyle(.bordered)
                         .frame(maxWidth: .infinity)
                     }
                 }
             }
-            .navigationTitle("Entry Detail")
+            .navigationTitle("Details")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {
@@ -236,6 +212,20 @@ struct VaultItemDetailView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(actionMessage ?? "")
+            }
+            .fileExporter(
+                isPresented: $showingCSVExporter,
+                document: exportDocument,
+                contentType: .commaSeparatedText,
+                defaultFilename: exportFilename
+            ) { result in
+                switch result {
+                case .success:
+                    actionMessage = "2FA CSV exported."
+                case .failure(let error):
+                    actionMessage = error.localizedDescription
+                }
+                exportDocument = nil
             }
         }
     }
@@ -261,5 +251,150 @@ struct VaultItemDetailView: View {
         }
         .font(.subheadline.weight(.semibold))
         .frame(maxWidth: .infinity, minHeight: 22)
+    }
+
+    private var otpCard: some View {
+        SurfaceCard {
+            VStack(alignment: .leading, spacing: 16) {
+                LatchSectionHeader(
+                    eyebrow: nil,
+                    title: "TCode",
+                    detail: ""
+                )
+
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    otpTimelineContent(for: context.date)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func otpTimelineContent(for date: Date) -> some View {
+        if let snapshot = model.totpSnapshot(for: item, at: date) {
+            otpSnapshotContent(snapshot)
+        } else {
+            Text("Unable to generate a code for this secret.")
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func otpSnapshotContent(_ snapshot: TOTPSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            otpCodePanel(snapshot)
+            otpActionRow(snapshot)
+        }
+    }
+
+    private func otpCodePanel(_ snapshot: TOTPSnapshot) -> some View {
+        let period = item.otpConfiguration?.period ?? 30
+
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(accentPalette.color.opacity(0.12))
+                    .frame(width: 44, height: 44)
+                    .overlay {
+                        Image(systemName: "lock.badge.clock.fill")
+                            .foregroundStyle(accentPalette.color)
+                    }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(snapshot.code)
+                        .font(.system(size: 36, weight: .bold, design: .monospaced))
+                        .textSelection(.enabled)
+                    Text("Expires in \(snapshot.secondsRemaining)s")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+            }
+
+            ProgressView(
+                value: Double(period - snapshot.secondsRemaining),
+                total: Double(period)
+            )
+            .tint(accentPalette.color)
+
+            HStack(spacing: 8) {
+                StatusPill(title: "\(period)s cycle", tone: .accent)
+                if let issuer = item.otpConfiguration?.issuer, !issuer.isEmpty {
+                    StatusPill(title: issuer, tone: .neutral)
+                }
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(accentPalette.color.opacity(0.10))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    private func otpActionRow(_ snapshot: TOTPSnapshot) -> some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 10) {
+                Button {
+                    model.copyToPasteboard(snapshot.code.replacingOccurrences(of: " ", with: ""))
+                    actionMessage = "Code copied."
+                } label: {
+                    sheetActionLabel(title: "Copy Current Code", systemImage: "doc.on.doc")
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(accentPalette.color)
+
+                Button {
+                    Task {
+                        guard await model.authorizeSensitiveAction(reason: "Export 2FA setup for \(item.service)") else { return }
+                        if let exportCSV = model.exportOTPCSV(for: item) {
+                            exportDocument = OTPCSVDocument(text: exportCSV)
+                            showingCSVExporter = true
+                        } else {
+                            actionMessage = "Unable to export this 2FA setup."
+                        }
+                    }
+                } label: {
+                    sheetActionLabel(title: "Export 2FA CSV", systemImage: "square.and.arrow.up")
+                }
+                .buttonStyle(.bordered)
+            }
+
+            Button {
+                onEdit()
+            } label: {
+                sheetActionLabel(title: "Import / Replace 2FA", systemImage: "square.and.arrow.down")
+            }
+            .buttonStyle(.bordered)
+        }
+    }
+
+    private var exportFilename: String {
+        let cleanedService = item.service
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: " ", with: "-")
+        return "\(cleanedService.isEmpty ? "two-factor" : cleanedService)-2fa"
+    }
+}
+
+private struct OTPCSVDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.commaSeparatedText] }
+
+    let text: String
+
+    init(text: String) {
+        self.text = text
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        guard
+            let data = configuration.file.regularFileContents,
+            let text = String(data: data, encoding: .utf8)
+        else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        self.text = text
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: Data(text.utf8))
     }
 }

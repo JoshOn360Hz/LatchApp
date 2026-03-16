@@ -4,7 +4,7 @@ struct VaultHomeView: View {
     @Bindable var model: LatchAppModel
 
     @State private var selectedItem: VaultItem?
-    @State private var presentingEditor = false
+    @State private var presentingNewEntry = false
     @State private var editingItem: VaultItem?
 
     var body: some View {
@@ -25,8 +25,7 @@ struct VaultHomeView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        editingItem = nil
-                        presentingEditor = true
+                        presentingNewEntry = true
                     } label: {
                         Image(systemName: "plus")
                     }
@@ -37,16 +36,18 @@ struct VaultHomeView: View {
                     model: model,
                     item: item,
                     onEdit: {
-                        selectedItem = nil
                         editingItem = item
-                        presentingEditor = true
+                        selectedItem = nil
                     }
                 )
             }
-            .sheet(isPresented: $presentingEditor, onDismiss: {
+            .sheet(isPresented: $presentingNewEntry) {
+                VaultEntryEditorView(model: model, editingItem: nil)
+            }
+            .sheet(item: $editingItem, onDismiss: {
                 editingItem = nil
-            }) {
-                VaultEntryEditorView(model: model, editingItem: editingItem)
+            }) { item in
+                VaultEntryEditorView(model: model, editingItem: item)
             }
         }
     }
