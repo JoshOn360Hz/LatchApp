@@ -1,0 +1,97 @@
+{
+  "fill" : {
+    "automatic-gradient" : "srgb:0.00000,0.32852,0.57488,1.00000"
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "blend-mode" : "normal",
+          "fill-specializations" : [
+            {
+              "value" : {
+                "solid" : "srgb:0.00000,0.32852,0.57488,1.00000"
+              }
+            },
+            {
+              "appearance" : "dark",
+              "value" : {
+                "solid" : "srgb:1.00000,1.00000,1.00000,1.00000"
+              }
+            }
+          ],
+          "glass" : false,
+          "image-name" : "latch-logo.png",
+          "name" : "latch-logo",
+          "position" : {
+            "scale" : 2,
+            "translation-in-points" : [
+              18,
+              -17
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    },
+    {
+      "layers" : [
+        {
+          "image-name" : "Latch-mid.png",
+          "name" : "Latch-mid",
+          "position" : {
+            "scale" : 2,
+            "translation-in-points" : [
+              19,
+              -18.2421875
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    },
+    {
+      "layers" : [
+        {
+          "image-name" : "latch-back.png",
+          "name" : "latch-back",
+          "position" : {
+            "scale" : 2,
+            "translation-in-points" : [
+              16,
+              -13.2421875
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}
