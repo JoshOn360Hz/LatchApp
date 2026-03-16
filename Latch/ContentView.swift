@@ -26,6 +26,7 @@ struct ContentView: View {
                 }
         }
         .tint(model.accentPalette.color)
+        .preferredColorScheme(model.appearance.colorScheme)
         .environment(\.latchAccentPalette, model.accentPalette)
         .overlay {
             if model.isLocked {

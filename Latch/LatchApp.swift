@@ -8,7 +8,6 @@ struct LatchApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView(model: model)
-                .preferredColorScheme(model.appearance.colorScheme)
                 .onChange(of: scenePhase, initial: true) { _, newValue in
                     model.handleScenePhaseChange(newValue)
                 }

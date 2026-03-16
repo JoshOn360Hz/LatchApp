@@ -1,10 +1,14 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import UIKit
 
 struct SettingsView: View {
     @Bindable var model: LatchAppModel
+    @Environment(\.colorScheme) private var colorScheme
     @State private var showingCSVImporter = false
     @State private var importMessage: String?
+    @State private var selectedAppIcon = AppIconOption.default
+    @State private var appIconError: String?
     private let githubURL = URL(string: "https://github.com/JoshOn360Hz/LatchApp")
 
     var body: some View {
@@ -31,6 +35,17 @@ struct SettingsView: View {
             } message: {
                 Text(importMessage ?? "")
             }
+            .alert("App Icon", isPresented: Binding(
+                get: { appIconError != nil },
+                set: { if !$0 { appIconError = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(appIconError ?? "")
+            }
+            .task {
+                refreshSelectedAppIcon()
+            }
         }
     }
 
@@ -43,12 +58,24 @@ struct SettingsView: View {
                     detail: nil
                 )
 
-                Picker("Appearance", selection: $model.appearance) {
+                HStack(spacing: 8) {
                     ForEach(AppAppearance.allCases) { appearance in
-                        Text(appearance.title).tag(appearance)
+                        Button {
+                            model.appearance = appearance
+                        } label: {
+                            Text(appearance.title)
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .fill(model.appearance == appearance ? model.accentPalette.color : AppTheme.secondaryCardFill(for: colorScheme))
+                                )
+                                .foregroundStyle(model.appearance == appearance ? Color.white : Color.primary)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
-                .pickerStyle(.segmented)
             }
         }
     }
@@ -127,6 +154,48 @@ struct SettingsView: View {
                     model.lockNow()
                 }
                 .buttonStyle(.bordered)
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Alternate App Icon")
+                        .font(.subheadline.weight(.semibold))
+
+                    ForEach(AppIconOption.allCases) { icon in
+                        Button {
+                            Task {
+                                await setAppIcon(icon)
+                            }
+                        } label: {
+                            HStack(spacing: 14) {
+                                iconPreview(for: icon)
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(icon.title)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.primary)
+
+                                    Text(icon.detail)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+
+                                Spacer()
+
+                                if selectedAppIcon == icon {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.title3)
+                                        .foregroundStyle(model.accentPalette.color)
+                                }
+                            }
+                            .padding(14)
+                            .background(
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    .fill(AppTheme.secondaryCardFill(for: colorScheme))
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(selectedAppIcon == icon)
+                    }
+                }
             }
         }
     }
@@ -187,5 +256,91 @@ struct SettingsView: View {
         } catch {
             importMessage = error.localizedDescription
         }
+    }
+
+    private func refreshSelectedAppIcon() {
+        selectedAppIcon = AppIconOption(iconName: UIApplication.shared.alternateIconName)
+    }
+
+    @MainActor
+    private func setAppIcon(_ icon: AppIconOption) async {
+        guard UIApplication.shared.supportsAlternateIcons else {
+            appIconError = "Alternate app icons are not available on this device."
+            return
+        }
+
+        do {
+            try await UIApplication.shared.setAlternateIconName(icon.iconName)
+            selectedAppIcon = icon
+        } catch {
+            appIconError = error.localizedDescription
+        }
+    }
+
+    @ViewBuilder
+    private func iconPreview(for icon: AppIconOption) -> some View {
+        Image(icon.previewAssetName)
+            .resizable()
+            .scaledToFill()
+        .frame(width: 52, height: 52)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        }
+    }
+}
+
+private enum AppIconOption: String, CaseIterable, Identifiable {
+    case `default`
+    case calc1 = "calc-icon-1"
+    case calc2 = "calc-icon-2"
+
+    var id: Self { self }
+
+    var iconName: String? {
+        switch self {
+        case .default:
+            nil
+        case .calc1, .calc2:
+            rawValue
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .default:
+            "Default"
+        case .calc1:
+            "Calc 1"
+        case .calc2:
+            "Calc 2"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .default:
+            "Use the default icon."
+        case .calc1:
+            "Use alternate icon 1."
+        case .calc2:
+            "Use alternate icon 2."
+        }
+    }
+
+    var previewAssetName: String {
+        switch self {
+        case .default:
+            "logo"
+        case .calc1:
+            "calc-1-preview"
+        case .calc2:
+            "calc-2-preview"
+        }
+    }
+
+    init(iconName: String?) {
+        self = AppIconOption(rawValue: iconName ?? "") ?? .default
     }
 }

@@ -258,7 +258,7 @@ struct VaultItemDetailView: View {
             VStack(alignment: .leading, spacing: 16) {
                 LatchSectionHeader(
                     eyebrow: nil,
-                    title: "TCode",
+                    title: "Code",
                     detail: ""
                 )
 

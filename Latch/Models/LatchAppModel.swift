@@ -15,7 +15,9 @@ final class LatchAppModel {
     @ObservationIgnored private var didFinishBootstrapping = false
     @ObservationIgnored private var autoLockTask: Task<Void, Never>?
     @ObservationIgnored private var lastInteractionDate: Date?
-    @ObservationIgnored private var didEnterBackground = false
+    @ObservationIgnored private var lastScenePhase: ScenePhase = .inactive
+    @ObservationIgnored private var isUnlockInProgress = false
+    @ObservationIgnored private var shouldSkipNextActivationLock = false
 
     var searchText = ""
     var appearance: AppAppearance = .system {
@@ -60,6 +62,7 @@ final class LatchAppModel {
     var isLocked = false {
         didSet {
             if isLocked {
+                authenticationError = nil
                 autoLockTask?.cancel()
             } else {
                 lastInteractionDate = .now
@@ -362,15 +365,21 @@ final class LatchAppModel {
     }
 
     func unlockVault() async {
+        guard !isUnlockInProgress else { return }
+
         guard biometricUnlockEnabled else {
             isLocked = false
             authenticationError = nil
             return
         }
 
+        isUnlockInProgress = true
+        defer { isUnlockInProgress = false }
+
         do {
             try await biometricAuth.authenticate(reason: "Unlock your private vault")
             authenticationError = nil
+            shouldSkipNextActivationLock = true
             isLocked = false
         } catch {
             authenticationError = error.localizedDescription
@@ -413,26 +422,36 @@ final class LatchAppModel {
         self.autoLockInterval = autoLockInterval
         hasCompletedOnboarding = true
         authenticationError = nil
+        shouldSkipNextActivationLock = false
         isLocked = false
     }
 
     func handleScenePhaseChange(_ scenePhase: ScenePhase) {
+        let previousScenePhase = lastScenePhase
+        lastScenePhase = scenePhase
+
         switch scenePhase {
         case .background:
-            didEnterBackground = true
             autoLockTask?.cancel()
         case .inactive:
-            break
+            autoLockTask?.cancel()
         case .active:
-            guard hasCompletedOnboarding, biometricUnlockEnabled else { return }
+            guard hasCompletedOnboarding else { return }
 
-            if didEnterBackground {
-                didEnterBackground = false
-                isLocked = true
+            if isUnlockInProgress {
                 return
             }
 
-            if !isLocked {
+            if shouldLockOnActivation(previousScenePhase: previousScenePhase) {
+                lockForAppOpen()
+                return
+            }
+
+            if shouldSkipNextActivationLock {
+                shouldSkipNextActivationLock = false
+            }
+
+            if !evaluateIdleLockIfNeeded() {
                 restartAutoLockTimerIfNeeded()
             }
         @unknown default:
@@ -459,15 +478,32 @@ final class LatchAppModel {
 
                 guard !Task.isCancelled else { return }
                 await MainActor.run {
-                    guard self.hasCompletedOnboarding, self.biometricUnlockEnabled, !self.isLocked else { return }
-
-                    let lastInteraction = self.lastInteractionDate ?? .now
-                    if Date().timeIntervalSince(lastInteraction) >= self.autoLockInterval {
-                        self.isLocked = true
-                    }
+                    _ = self.evaluateIdleLockIfNeeded()
                 }
             }
         }
+    }
+
+    private func shouldLockOnActivation(previousScenePhase: ScenePhase) -> Bool {
+        guard biometricUnlockEnabled, previousScenePhase != .active else { return false }
+        guard !shouldSkipNextActivationLock else { return false }
+        return true
+    }
+
+    private func lockForAppOpen() {
+        isLocked = biometricUnlockEnabled
+    }
+
+    private func evaluateIdleLockIfNeeded(referenceDate: Date = .now) -> Bool {
+        guard hasCompletedOnboarding, biometricUnlockEnabled, !isLocked else { return false }
+
+        let lastInteraction = lastInteractionDate ?? referenceDate
+        guard referenceDate.timeIntervalSince(lastInteraction) >= autoLockInterval else {
+            return false
+        }
+
+        isLocked = true
+        return true
     }
 
     private func loadSettings() {
