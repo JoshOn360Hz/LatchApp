@@ -15,6 +15,7 @@ final class LatchAppModel {
     @ObservationIgnored private var didFinishBootstrapping = false
     @ObservationIgnored private var autoLockTask: Task<Void, Never>?
     @ObservationIgnored private var lastInteractionDate: Date?
+    @ObservationIgnored private var didEnterBackground = false
 
     var searchText = ""
     var appearance: AppAppearance = .system {
@@ -61,13 +62,12 @@ final class LatchAppModel {
             if isLocked {
                 autoLockTask?.cancel()
             } else {
+                lastInteractionDate = .now
                 restartAutoLockTimerIfNeeded()
             }
         }
     }
     var authenticationError: String?
-
-    @ObservationIgnored private var lastBackgroundDate: Date?
 
     init() {
         self.repository = VaultRepository()
@@ -418,15 +418,21 @@ final class LatchAppModel {
 
     func handleScenePhaseChange(_ scenePhase: ScenePhase) {
         switch scenePhase {
-        case .background, .inactive:
-            lastBackgroundDate = .now
+        case .background:
+            didEnterBackground = true
             autoLockTask?.cancel()
+        case .inactive:
+            break
         case .active:
             guard hasCompletedOnboarding, biometricUnlockEnabled else { return }
-            if let lastBackgroundDate, Date().timeIntervalSince(lastBackgroundDate) >= autoLockInterval {
+
+            if didEnterBackground {
+                didEnterBackground = false
                 isLocked = true
-            } else if !isLocked {
-                lastInteractionDate = .now
+                return
+            }
+
+            if !isLocked {
                 restartAutoLockTimerIfNeeded()
             }
         @unknown default:
@@ -439,18 +445,27 @@ final class LatchAppModel {
 
         guard hasCompletedOnboarding, biometricUnlockEnabled, !isLocked else { return }
 
-        let interval = max(autoLockInterval, 1)
-        autoLockTask = Task { [interval] in
-            do {
-                try await Task.sleep(for: .seconds(interval))
-            } catch {
-                return
-            }
+        if lastInteractionDate == nil {
+            lastInteractionDate = .now
+        }
 
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                guard self.hasCompletedOnboarding, self.biometricUnlockEnabled, !self.isLocked else { return }
-                self.isLocked = true
+        autoLockTask = Task {
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: .seconds(1))
+                } catch {
+                    return
+                }
+
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    guard self.hasCompletedOnboarding, self.biometricUnlockEnabled, !self.isLocked else { return }
+
+                    let lastInteraction = self.lastInteractionDate ?? .now
+                    if Date().timeIntervalSince(lastInteraction) >= self.autoLockInterval {
+                        self.isLocked = true
+                    }
+                }
             }
         }
     }

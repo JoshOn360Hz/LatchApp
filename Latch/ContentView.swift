@@ -50,6 +50,13 @@ struct ContentView: View {
                 },
             including: .all
         )
+        .simultaneousGesture(
+            TapGesture()
+                .onEnded {
+                    model.registerUserInteraction()
+                },
+            including: .all
+        )
     }
 }
 
