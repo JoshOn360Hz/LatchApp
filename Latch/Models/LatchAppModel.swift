@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 @Observable
 final class LatchAppModel {
+    @ObservationIgnored private static let clipboardClearDelay: Duration = .seconds(60)
     @ObservationIgnored private let repository: VaultRepository
     @ObservationIgnored private let keychain: KeychainService
     @ObservationIgnored private let biometricAuth: BiometricAuthService
@@ -12,6 +13,8 @@ final class LatchAppModel {
     @ObservationIgnored private let csvImportService: CSVPasswordImportService
     @ObservationIgnored private let settingsStore: AppSettingsStore
     @ObservationIgnored private var didFinishBootstrapping = false
+    @ObservationIgnored private var autoLockTask: Task<Void, Never>?
+    @ObservationIgnored private var lastInteractionDate: Date?
 
     var searchText = ""
     var appearance: AppAppearance = .system {
@@ -21,13 +24,20 @@ final class LatchAppModel {
         didSet { persistSettingsIfNeeded() }
     }
     var autoLockInterval: Double = 60 {
-        didSet { persistSettingsIfNeeded() }
+        didSet {
+            persistSettingsIfNeeded()
+            restartAutoLockTimerIfNeeded()
+        }
     }
     var biometricUnlockEnabled = true {
         didSet {
             persistSettingsIfNeeded()
             if biometricUnlockEnabled {
                 isLocked = true
+            } else {
+                isLocked = false
+                authenticationError = nil
+                autoLockTask?.cancel()
             }
         }
     }
@@ -46,7 +56,15 @@ final class LatchAppModel {
     var generatedPassword = "V4ult#Signal!28"
     var vaultItems: [VaultItem] = []
     var securityFindings: [SecurityFinding] = []
-    var isLocked = false
+    var isLocked = false {
+        didSet {
+            if isLocked {
+                autoLockTask?.cancel()
+            } else {
+                restartAutoLockTimerIfNeeded()
+            }
+        }
+    }
     var authenticationError: String?
 
     @ObservationIgnored private var lastBackgroundDate: Date?
@@ -228,6 +246,13 @@ final class LatchAppModel {
 
     func copyToPasteboard(_ value: String) {
         PasteboardClient.copy(value)
+
+        guard clearClipboardEnabled else { return }
+
+        Task.detached(priority: .utility) {
+            try? await Task.sleep(for: Self.clipboardClearDelay)
+            PasteboardClient.clearIfUnchanged(value)
+        }
     }
 
     func importedDraft(from scannedCode: String, fallbackUsername: String) throws -> OTPImportedData {
@@ -371,6 +396,18 @@ final class LatchAppModel {
         isLocked = biometricUnlockEnabled
     }
 
+    func registerUserInteraction() {
+        guard hasCompletedOnboarding, biometricUnlockEnabled, !isLocked else { return }
+
+        let now = Date()
+        if let lastInteractionDate, now.timeIntervalSince(lastInteractionDate) < 0.75 {
+            return
+        }
+
+        lastInteractionDate = now
+        restartAutoLockTimerIfNeeded()
+    }
+
     func completeOnboarding(enableBiometricUnlock: Bool, autoLockInterval: Double) {
         biometricUnlockEnabled = enableBiometricUnlock
         self.autoLockInterval = autoLockInterval
@@ -383,13 +420,38 @@ final class LatchAppModel {
         switch scenePhase {
         case .background, .inactive:
             lastBackgroundDate = .now
+            autoLockTask?.cancel()
         case .active:
-            guard biometricUnlockEnabled else { return }
+            guard hasCompletedOnboarding, biometricUnlockEnabled else { return }
             if let lastBackgroundDate, Date().timeIntervalSince(lastBackgroundDate) >= autoLockInterval {
                 isLocked = true
+            } else if !isLocked {
+                lastInteractionDate = .now
+                restartAutoLockTimerIfNeeded()
             }
         @unknown default:
             break
+        }
+    }
+
+    private func restartAutoLockTimerIfNeeded() {
+        autoLockTask?.cancel()
+
+        guard hasCompletedOnboarding, biometricUnlockEnabled, !isLocked else { return }
+
+        let interval = max(autoLockInterval, 1)
+        autoLockTask = Task { [interval] in
+            do {
+                try await Task.sleep(for: .seconds(interval))
+            } catch {
+                return
+            }
+
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard self.hasCompletedOnboarding, self.biometricUnlockEnabled, !self.isLocked else { return }
+                self.isLocked = true
+            }
         }
     }
 

@@ -43,6 +43,13 @@ struct ContentView: View {
                 .interactiveDismissDisabled()
         }
         .animation(.smooth, value: model.isLocked)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    model.registerUserInteraction()
+                },
+            including: .all
+        )
     }
 }
 

@@ -15,4 +15,16 @@ enum PasteboardClient {
         UIPasteboard.general.string = string
         #endif
     }
+
+    static func clearIfUnchanged(_ string: String) {
+        #if canImport(AppKit)
+        if NSPasteboard.general.string(forType: .string) == string {
+            NSPasteboard.general.clearContents()
+        }
+        #elseif canImport(UIKit)
+        if UIPasteboard.general.string == string {
+            UIPasteboard.general.string = nil
+        }
+        #endif
+    }
 }
