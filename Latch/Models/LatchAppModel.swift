@@ -40,6 +40,9 @@ final class LatchAppModel {
     var prefersNumbers = true {
         didSet { persistSettingsIfNeeded() }
     }
+    var hasCompletedOnboarding = false {
+        didSet { persistSettingsIfNeeded() }
+    }
     var generatedPassword = "V4ult#Signal!28"
     var vaultItems: [VaultItem] = []
     var securityFindings: [SecurityFinding] = []
@@ -60,7 +63,7 @@ final class LatchAppModel {
         loadSettings()
         loadVault()
 
-        isLocked = biometricUnlockEnabled
+        isLocked = hasCompletedOnboarding && biometricUnlockEnabled
         didFinishBootstrapping = true
     }
 
@@ -368,6 +371,14 @@ final class LatchAppModel {
         isLocked = biometricUnlockEnabled
     }
 
+    func completeOnboarding(enableBiometricUnlock: Bool, autoLockInterval: Double) {
+        biometricUnlockEnabled = enableBiometricUnlock
+        self.autoLockInterval = autoLockInterval
+        hasCompletedOnboarding = true
+        authenticationError = nil
+        isLocked = false
+    }
+
     func handleScenePhaseChange(_ scenePhase: ScenePhase) {
         switch scenePhase {
         case .background, .inactive:
@@ -391,6 +402,7 @@ final class LatchAppModel {
         clearClipboardEnabled = settings.clearClipboardEnabled
         prefersSymbols = settings.prefersSymbols
         prefersNumbers = settings.prefersNumbers
+        hasCompletedOnboarding = settings.hasCompletedOnboarding
     }
 
     private func persistSettingsIfNeeded() {
@@ -403,7 +415,8 @@ final class LatchAppModel {
                 biometricUnlockEnabled: biometricUnlockEnabled,
                 clearClipboardEnabled: clearClipboardEnabled,
                 prefersSymbols: prefersSymbols,
-                prefersNumbers: prefersNumbers
+                prefersNumbers: prefersNumbers,
+                hasCompletedOnboarding: hasCompletedOnboarding
             )
         )
     }

@@ -33,6 +33,15 @@ struct ContentView: View {
                     .transition(.opacity)
             }
         }
+        .fullScreenCover(
+            isPresented: Binding(
+                get: { !model.hasCompletedOnboarding },
+                set: { _ in }
+            )
+        ) {
+            OnboardingView(model: model)
+                .interactiveDismissDisabled()
+        }
         .animation(.smooth, value: model.isLocked)
     }
 }

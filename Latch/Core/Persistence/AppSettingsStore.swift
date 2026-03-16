@@ -8,6 +8,7 @@ struct AppSettings: Codable {
     var clearClipboardEnabled = true
     var prefersSymbols = true
     var prefersNumbers = true
+    var hasCompletedOnboarding = false
 }
 
 struct AppSettingsStore {
