@@ -220,6 +220,14 @@ struct SettingsView: View {
                     }
                     .buttonStyle(.bordered)
                 }
+
+                Button {
+                    model.replayOnboarding()
+                } label: {
+                    Label("Replay Onboarding", systemImage: "arrow.counterclockwise")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
             }
         }
     }

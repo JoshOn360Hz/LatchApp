@@ -58,6 +58,12 @@ struct OnboardingView: View {
                     .foregroundStyle(.primary.opacity(0.9))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 28)
+
+                Text("Latch does not create an account, sync to a server, or keep a backup for you.")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppTheme.warning)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 30)
             }
 
             VStack(spacing: 14) {
@@ -108,8 +114,8 @@ struct OnboardingView: View {
 
                 InstructionStepRow(
                     number: "3",
-                    title: "Unlock and copy quickly",
-                    description: "Use Face ID when enabled, then open any item to copy a password or view the latest TOTP code."
+                    title: "Understand the tradeoff",
+                    description: "Latch is account-free and local-only, so if you delete the app or lose the device there is no built-in cloud restore."
                 )
             }
             .padding(.horizontal, 30)
@@ -139,28 +145,38 @@ struct OnboardingView: View {
                     .multilineTextAlignment(.center)
             }
 
-            VStack(spacing: 16) {
-                PermissionStyleRow(
-                    icon: "faceid",
-                    title: "Biometric unlock",
-                    description: enableBiometricUnlock
-                        ? "Face ID will be required before someone can re-open your vault."
-                        : "Latch will open directly until you enable biometric unlock in Settings."
-                )
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 16) {
+                    PermissionStyleRow(
+                        icon: "faceid",
+                        title: "Biometric unlock",
+                        description: enableBiometricUnlock
+                            ? "Face ID will be required before someone can re-open your vault."
+                            : "Latch will open directly until you enable biometric unlock in Settings."
+                    )
 
-                PermissionStyleRow(
-                    icon: "timer",
-                    title: "Auto-lock after \(lockLabel)",
-                    description: "If the app stays in the background longer than this, the vault locks on your next return."
-                )
+                    PermissionStyleRow(
+                        icon: "timer",
+                        title: "Auto-lock after \(lockLabel)",
+                        description: "If the app stays in the background longer than this, the vault locks on your next return."
+                    )
 
-                PermissionStyleRow(
-                    icon: "key.fill",
-                    title: "Secrets stay local",
-                    description: "Passwords and OTP secrets are stored on-device with Keychain-backed protection."
-                )
+                    PermissionStyleRow(
+                        icon: "key.fill",
+                        title: "Secrets stay local",
+                        description: "Passwords and OTP secrets are stored on-device with Keychain-backed protection."
+                    )
+
+                    PermissionStyleRow(
+                        icon: "exclamationmark.triangle.fill",
+                        title: "No account, no backup",
+                        description: "Latch does not have accounts, cloud sync, or recovery. If this device is erased, your vault cannot be restored unless you exported it yourself."
+                    )
+                }
+                .padding(.horizontal, 30)
+                .padding(.vertical, 1)
             }
-            .padding(.horizontal, 30)
+            .frame(maxHeight: 300)
 
             VStack(spacing: 18) {
                 Toggle("Use Face ID to unlock Latch", isOn: $enableBiometricUnlock)
@@ -197,7 +213,7 @@ struct OnboardingView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(accentPalette.color)
 
-                Text("You can change these settings later from the Settings tab.")
+                Text("You can change these settings later from the Settings tab, but Latch still will not create an account or automatic backup.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

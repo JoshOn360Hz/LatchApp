@@ -59,6 +59,7 @@ final class LatchAppModel {
     var generatedPassword = "V4ult#Signal!28"
     var vaultItems: [VaultItem] = []
     var securityFindings: [SecurityFinding] = []
+    var isShowingOnboarding = false
     var isLocked = false {
         didSet {
             if isLocked {
@@ -421,9 +422,14 @@ final class LatchAppModel {
         biometricUnlockEnabled = enableBiometricUnlock
         self.autoLockInterval = autoLockInterval
         hasCompletedOnboarding = true
+        isShowingOnboarding = false
         authenticationError = nil
         shouldSkipNextActivationLock = false
         isLocked = false
+    }
+
+    func replayOnboarding() {
+        isShowingOnboarding = true
     }
 
     func handleScenePhaseChange(_ scenePhase: ScenePhase) {

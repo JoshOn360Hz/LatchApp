@@ -36,7 +36,7 @@ struct ContentView: View {
         }
         .fullScreenCover(
             isPresented: Binding(
-                get: { !model.hasCompletedOnboarding },
+                get: { !model.hasCompletedOnboarding || model.isShowingOnboarding },
                 set: { _ in }
             )
         ) {
